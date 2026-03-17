@@ -210,6 +210,8 @@ int UIScene_LoadOrJoinMenu::LoadSaveCallback(LPVOID lpParam,bool bRes)
 
 UIScene_LoadOrJoinMenu::UIScene_LoadOrJoinMenu(int iPad, void *initData, UILayer *parentLayer) : UIScene(iPad, parentLayer)
 {
+    constexpr uint64_t MAXIMUM_SAVE_STORAGE = 4LL * 1024LL * 1024LL * 1024LL;
+
     // Setup all the Iggy references we need for this scene
     initialiseMovie();
     app.SetLiveLinkRequired( true );
@@ -234,8 +236,8 @@ UIScene_LoadOrJoinMenu::UIScene_LoadOrJoinMenu(int iPad, void *initData, UILayer
     m_controlJoinTimer.setVisible( true );
 
 
-#if defined(_XBOX_ONE) || defined(__ORBIS__)
-    m_spaceIndicatorSaves.init(L"",eControl_SpaceIndicator,0, (4LL *1024LL * 1024LL * 1024LL) );
+#if defined(_XBOX_ONE) || defined(__ORBIS__) || defined(_WINDOWS64)
+    m_spaceIndicatorSaves.init(L"",eControl_SpaceIndicator,0, MAXIMUM_SAVE_STORAGE);
 #endif
     m_bUpdateSaveSize = false;
 
@@ -699,7 +701,7 @@ void UIScene_LoadOrJoinMenu::tick()
 		if(m_eSaveTransferState == eSaveTransfer_Idle)
 			m_bSaveTransferRunning = false;
 #endif
-#if defined(_XBOX_ONE) || defined(__ORBIS__)
+#if defined(_XBOX_ONE) || defined(__ORBIS__) || defined(_WINDOWS64)
         if(m_bUpdateSaveSize)
         {
             if((m_iDefaultButtonsC > 0) && (m_iSaveListIndex >= m_iDefaultButtonsC))
@@ -720,7 +722,7 @@ void UIScene_LoadOrJoinMenu::tick()
             if(m_pSaveDetails!=nullptr)
             {
                 //CD - Fix - Adding define for ORBIS/XBOXONE
-#if defined(_XBOX_ONE) || defined(__ORBIS__)
+#if defined(_XBOX_ONE) || defined(__ORBIS__) || defined(_WINDOWS64)
                 m_spaceIndicatorSaves.reset();
 #endif
 
@@ -762,6 +764,22 @@ void UIScene_LoadOrJoinMenu::tick()
                 {
 #if defined(_XBOX_ONE)
                     m_spaceIndicatorSaves.addSave(m_pSaveDetails->SaveInfoA[i].totalSize);
+#elif defined(_WINDOWS64)
+                    int origIdx = sortedIdx[i];
+                    wchar_t wFilename[MAX_SAVEFILENAME_LENGTH];
+                    ZeroMemory(wFilename, sizeof(wFilename));
+                    mbstowcs(wFilename, m_pSaveDetails->SaveInfoA[origIdx].UTF8SaveFilename, MAX_SAVEFILENAME_LENGTH - 1);
+                    wstring filePath = wstring(L"Windows64\\GameHDD\\") + wstring(wFilename) + wstring(L"\\saveData.ms");
+
+                    HANDLE hFile = CreateFileW(filePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
+                    DWORD fileSize = 0;
+
+                    if (hFile != INVALID_HANDLE_VALUE) {
+                        fileSize = GetFileSize(hFile, nullptr);
+                        if (fileSize < 12 || fileSize == INVALID_FILE_SIZE) fileSize = 0;
+                        CloseHandle(hFile);
+                    }
+                    m_spaceIndicatorSaves.addSave(fileSize);
 #elif defined(__ORBIS__)
                     m_spaceIndicatorSaves.addSave(m_pSaveDetails->SaveInfoA[i].blocksUsed * (32 * 1024) );
 #endif
@@ -774,11 +792,6 @@ void UIScene_LoadOrJoinMenu::tick()
 #else
 #ifdef _WINDOWS64
                     {
-                        int origIdx = sortedIdx[i];
-                        wchar_t wFilename[MAX_SAVEFILENAME_LENGTH];
-                        ZeroMemory(wFilename, sizeof(wFilename));
-                        mbstowcs(wFilename, m_pSaveDetails->SaveInfoA[origIdx].UTF8SaveFilename, MAX_SAVEFILENAME_LENGTH - 1);
-                        wstring filePath = wstring(L"Windows64\\GameHDD\\") + wstring(wFilename) + wstring(L"\\saveData.ms");
                         bool saveHardcore = false;
                         wstring levelName = ReadLevelNameFromSaveFile(filePath, &saveHardcore);
                         m_saveDetails[i].isHardcore = saveHardcore;
