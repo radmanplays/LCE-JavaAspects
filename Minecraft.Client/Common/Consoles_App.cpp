@@ -206,6 +206,8 @@ CMinecraftApp::CMinecraftApp()
 	m_dwRequiredTexturePackID=0;
 
 	m_bResetNether=false;
+	m_seedOverride = 0;
+	m_hasSeedOverride = false;
 
 #ifdef _XBOX
 	//	m_bTransferSavesToXboxOne=false;
