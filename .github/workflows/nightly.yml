@@ -185,6 +185,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: Nightly-Dedicated-Server
+        prerelease: false
         name: "Server: ${{ steps.sha.outputs.short }}"
         body: |
           Dedicated Server runtime for Windows64.
@@ -222,6 +223,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: Nightly
+        prerelease: false
         name: "Client: ${{ steps.sha.outputs.short }}"
         body: |
           # Instructions:
