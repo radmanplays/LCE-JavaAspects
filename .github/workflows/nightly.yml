@@ -179,20 +179,37 @@ jobs:
       id: sha
       run: echo "short=$(echo '${{ github.sha }}' | cut -c1-7)" >> "$GITHUB_OUTPUT"
 
-    - name: Update release
-      uses: andelf/nightly-release@main
+    - name: Delete old release
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: Nightly-Dedicated-Server
-        prerelease: false
-        name: "Server: ${{ steps.sha.outputs.short }}"
-        body: |
-          Dedicated Server runtime for Windows64.
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: gh release delete Nightly-Dedicated-Server --yes --cleanup-tag || true
 
-          Download `LCREServerWindows64.zip` and extract it to a folder where you'd like to keep the server runtime.
-        files: |
-          artifacts/*
+    - name: Create signed tag
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh api repos/${{ github.repository }}/git/refs \
+          --method POST \
+          --field ref="refs/tags/Nightly-Dedicated-Server" \
+          --field sha="${{ github.sha }}" || \
+        gh api repos/${{ github.repository }}/git/refs/tags/Nightly-Dedicated-Server \
+          --method PATCH \
+          --field sha="${{ github.sha }}" \
+          --field force=true
+
+    - name: Create release
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        cat > notes.md << 'EOF'
+        Dedicated Server runtime for Windows64.
+
+        Download `LCREServerWindows64.zip` and extract it to a folder where you'd like to keep the server runtime.
+        EOF
+        gh release create Nightly-Dedicated-Server artifacts/* \
+          --title "Server: ${{ steps.sha.outputs.short }}" \
+          --notes-file notes.md \
+          --latest=false
 
   release-client:
     name: Release Client
@@ -217,50 +234,66 @@ jobs:
       id: sha
       run: echo "short=$(echo '${{ github.sha }}' | cut -c1-7)" >> "$GITHUB_OUTPUT"
 
-    - name: Update release
-      uses: andelf/nightly-release@main
+    - name: Delete old release
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: Nightly
-        prerelease: false
-        name: "Client: ${{ steps.sha.outputs.short }}"
-        body: |
-          # Instructions:
-          **Newcomers:**
-          - If this is your first time, download `LCREWindows64.zip` and extract it wherever you would like to keep it.
-          - I would recommend to set your username prior to launch (create a file called `username.txt`, put your desired username into the file, and save).
-          - To play, simply run `Minecraft.Client.exe`.
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: gh release delete Nightly --yes --cleanup-tag || true
 
-          **For those that wish to update their existing installation with the latest build:**
-          - Download `Minecraft.Client.exe` and `Minecraft.Client.pdb` and copy them over to your existing LCREWindows64 build (overwrite your old version of Minecraft.Client.exe and Minecraft.Client.pdb).
+    - name: Create signed tag
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh api repos/${{ github.repository }}/git/refs \
+          --method POST \
+          --field ref="refs/tags/Nightly" \
+          --field sha="${{ github.sha }}" || \
+        gh api repos/${{ github.repository }}/git/refs/tags/Nightly \
+          --method PATCH \
+          --field sha="${{ github.sha }}" \
+          --field force=true
 
-          **Steam Deck & Linux:**
-          - Y'all know the drill. Download the `LCREWindows64.zip`, extract it, add the `Minecraft.Client.exe` as a "Non-Steam Game" within the Steam library, turn on compatibility mode with Proton Experimental, and then run it!
+    - name: Create release
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        cat > notes.md << 'EOF'
+        # Instructions:
+        **Newcomers:**
+        - If this is your first time, download `LCREWindows64.zip` and extract it wherever you would like to keep it.
+        - I would recommend to set your username prior to launch (create a file called `username.txt`, put your desired username into the file, and save).
+        - To play, simply run `Minecraft.Client.exe`.
 
-          # Multiplayer instructions:
-          LAN games are natively supported, and any LAN games will appear automatically on the right. However, if you'd like to play with your friends online (and if you don't want to require them to setup a vpn, and/or if you don't want to port forward), I would recommend the following setup. Please keep in mind, you do NOT need to do this to enjoy the game. This is just how I have it setup for me so my friends can join without any hassle:
+        **For those that wish to update their existing installation with the latest build:**
+        - Download `Minecraft.Client.exe` and `Minecraft.Client.pdb` and copy them over to your existing LCREWindows64 build (overwrite your old version of Minecraft.Client.exe and Minecraft.Client.pdb).
 
-          Prerequisites:
-          - Premium playit.gg account, costs about $3 USD per month. This is for setting up the tunnel.
-          - playit.gg agent installed on host PC.
+        **Steam Deck & Linux:**
+        - Y'all know the drill. Download the `LCREWindows64.zip`, extract it, add the `Minecraft.Client.exe` as a "Non-Steam Game" within the Steam library, turn on compatibility mode with Proton Experimental, and then run it!
 
-          How-to:
-          - Ensure your playit.gg agent is connected to your playit.gg account
-          - On the playit.gg website, setup a new tunnel (choose TCP). Ensure the configurable settings are set to the below values, assuming your agent is installed on the same computer as your online LCREMinecraft game is hosted from.
-          - Configurable settings:
-            - Local IP: `127.0.0.1`
-            - Local Port: `25565`
-            - Proxy Protocol: `None`
-          - After creating your tunnel, navigate to the "Tunnels" main page. You'll see the IP address and port for your tunnel. This is what your friends will input when adding your server in order to join your online game!
+        # Multiplayer instructions:
+        LAN games are natively supported, and any LAN games will appear automatically on the right. However, if you'd like to play with your friends online (and if you don't want to require them to setup a vpn, and/or if you don't want to port forward), I would recommend the following setup. Please keep in mind, you do NOT need to do this to enjoy the game. This is just how I have it setup for me so my friends can join without any hassle:
+
+        Prerequisites:
+        - Premium playit.gg account, costs about $3 USD per month. This is for setting up the tunnel.
+        - playit.gg agent installed on host PC.
+
+        How-to:
+        - Ensure your playit.gg agent is connected to your playit.gg account
+        - On the playit.gg website, setup a new tunnel (choose TCP). Ensure the configurable settings are set to the below values, assuming your agent is installed on the same computer as your online LCREMinecraft game is hosted from.
+        - Configurable settings:
+          - Local IP: `127.0.0.1`
+          - Local Port: `25565`
+          - Proxy Protocol: `None`
+        - After creating your tunnel, navigate to the "Tunnels" main page. You'll see the IP address and port for your tunnel. This is what your friends will input when adding your server in order to join your online game!
 
 
-          # Why this fork exists:
-          Changes/additions that stray from the upstream repo (`smartcmd/MinecraftConsoles`:
-          - See: https://github.com/itsRevela/MinecraftConsoles?tab=readme-ov-file#latest
-          - I can tweak this fork while staying compatible with the upstream repo without needing to wait on my pull requests to get accepted upstream (while keeping this fork updated with the latest and greatest from upstream)
-        files: |
-          artifacts/*
+        # Why this fork exists:
+        Changes/additions that stray from the upstream repo (`smartcmd/MinecraftConsoles`:
+        - See: https://github.com/itsRevela/MinecraftConsoles?tab=readme-ov-file#latest
+        - I can tweak this fork while staying compatible with the upstream repo without needing to wait on my pull requests to get accepted upstream (while keeping this fork updated with the latest and greatest from upstream)
+        EOF
+        gh release create Nightly artifacts/* \
+          --title "Client: ${{ steps.sha.outputs.short }}" \
+          --notes-file notes.md
 
   cleanup:
     needs: [release-client, release-server]
