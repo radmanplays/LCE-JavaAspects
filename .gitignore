@@ -415,3 +415,8 @@ build/
 tmp*/
 _server_asset_probe/
 server-data/
+
+# Tools build artifacts and intermediates
+tools/*.class
+tools/*.swf
+tools/staging/
