@@ -16,6 +16,7 @@
 #include "..\Security\IdentityTokenManager.h"
 #include "..\WorldManager.h"
 #include "..\Console\ServerCli.h"
+#include "..\..\Minecraft.World\ConsoleSaveFileOriginal.h"
 #include "Tesselator.h"
 #include "Windows64/4JLibs/inc/4J_Render.h"
 #include "Windows64/GameConfig/Minecraft.spa.h"
@@ -330,6 +331,7 @@ static void TickCoreSystems()
 	g_NetworkManager.DoWork();
 	ProfileManager.Tick();
 	StorageManager.Tick();
+	ConsoleSaveFileOriginal::CommitPendingAsyncSave();
 }
 
 /**

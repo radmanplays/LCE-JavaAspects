@@ -14,6 +14,13 @@ This project is based on source code of Minecraft Legacy Console Edition v1.6.05
 
 ## Latest:
 
+### Async Autosave (Dedicated Server)
+
+- Autosave no longer freezes the server. Previously, every autosave compressed the entire world save file with zlib synchronously on the main thread, blocking all game ticks for 2-6 seconds depending on world size
+- The save buffer is now snapshotted (memcpy) while holding the lock (~18ms), then compression runs on a background thread. The compressed data is committed back to StorageManager on the next main-thread tick
+- Additionally, autosave on the dedicated server now only flushes entity data instead of re-saving all dirty chunks, matching the Xbox/Orbis behavior. Chunks are already saved continuously by the per-tick trickle save process
+- Autosave timing breakdown is now logged to `server.log` for diagnostics (e.g. `autosave breakdown: players=0ms levels=0ms rules=0ms flush=18ms total=18ms`)
+
 ### Dedicated Server Entity Tracking Optimization
 
 - Eliminated unnecessary O(players^2 * entities) split-screen system-mate checks in the entity tracker on dedicated servers. The `EntityTracker::tick()`, `TrackedEntity::isVisible()`, and `TrackedEntity::broadcast()` functions all contained loops that called `IsSameSystem()` to support console split-screen couch co-op visibility expansion. On dedicated servers, all players are remote, so `IsSameSystem()` always returns false and these loops did nothing but waste CPU every tick

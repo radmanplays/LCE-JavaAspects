@@ -77,6 +77,11 @@ public:
 	virtual void LockSaveAccess();
 	virtual void ReleaseSaveAccess();
 
+#ifdef _WINDOWS64
+	// Called from the main thread to commit a completed async save to StorageManager.
+	static void CommitPendingAsyncSave();
+#endif
+
 	virtual ESavePlatform getSavePlatform();
 	virtual bool isSaveEndianDifferent();
 	virtual void setLocalPlatform();

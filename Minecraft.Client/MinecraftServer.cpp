@@ -34,6 +34,9 @@
 #ifdef _WINDOWS64
 #include "Windows64\Network\WinsockNetLayer.h"
 #endif
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+#include "..\Minecraft.Server\ServerLogger.h"
+#endif
 #include <sstream>
 #ifdef SPLIT_SAVES
 #include "..\Minecraft.World\ConsoleSaveFileSplit.h"
@@ -1881,10 +1884,22 @@ void MinecraftServer::run(int64_t seed, void *lpParameter)
                         QueryPerformanceCounter(&qwTime);
 #endif
 
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+                        LARGE_INTEGER asTicksPerSec, asT0, asT1;
+                        QueryPerformanceFrequency(&asTicksPerSec);
+                        double asSecsPerTick = 1.0 / (double)asTicksPerSec.QuadPart;
+                        QueryPerformanceCounter(&asT0);
+                        LARGE_INTEGER asAfterPlayers, asAfterLevels, asAfterRules, asAfterFlush;
+#endif
+
                         if (players != nullptr)
                         {
                             players->saveAll(nullptr);
                         }
+
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+                        QueryPerformanceCounter(&asAfterPlayers);
+#endif
 
                         for (unsigned int j = 0; j < levels.length; j++)
                         {
@@ -1901,6 +1916,11 @@ void MinecraftServer::run(int64_t seed, void *lpParameter)
                             PIXEndNamedEvent();
 #endif
                         }
+
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+                        QueryPerformanceCounter(&asAfterLevels);
+#endif
+
                         if (!s_bServerHalted)
                         {
 #if defined(_XBOX_ONE) || defined(__ORBIS__)
@@ -1912,7 +1932,24 @@ void MinecraftServer::run(int64_t seed, void *lpParameter)
 
                             PIXBeginNamedEvent(0, "Save to disc");
 #endif
+
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+                            QueryPerformanceCounter(&asAfterRules);
+#endif
+
                             levels[0]->saveToDisc(Minecraft::GetInstance()->progressRenderer, true);
+
+#if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
+                            QueryPerformanceCounter(&asAfterFlush);
+                            ServerRuntime::LogInfof("world-io",
+                                "autosave breakdown: players=%.0fms levels=%.0fms rules=%.0fms flush=%.0fms total=%.0fms",
+                                (asAfterPlayers.QuadPart - asT0.QuadPart) * asSecsPerTick * 1000.0,
+                                (asAfterLevels.QuadPart - asAfterPlayers.QuadPart) * asSecsPerTick * 1000.0,
+                                (asAfterRules.QuadPart - asAfterLevels.QuadPart) * asSecsPerTick * 1000.0,
+                                (asAfterFlush.QuadPart - asAfterRules.QuadPart) * asSecsPerTick * 1000.0,
+                                (asAfterFlush.QuadPart - asT0.QuadPart) * asSecsPerTick * 1000.0);
+#endif
+
 #if defined(_XBOX_ONE) || defined(__ORBIS__)
                             PIXEndNamedEvent();
 #endif
