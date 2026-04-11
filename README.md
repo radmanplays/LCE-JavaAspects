@@ -494,4 +494,4 @@ For more information, see [COMPILE.md](COMPILE.md).
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=smartcmd/MinecraftConsoles&type=date&legend=top-left)](https://www.star-history.com/?spm=a2c6h.12873639.article-detail.7.7b9d7fabjNxTRk#smartcmd/MinecraftConsoles&type=date&legend=top-left)
+[![Star History Chart](https://api.star-history.com/svg?repos=MCLCE/MinecraftConsoles&type=date&legend=top-left)](https://www.star-history.com/?spm=a2c6h.12873639.article-detail.7.7b9d7fabjNxTRk#MCLCE/MinecraftConsoles&type=date&legend=top-left)
