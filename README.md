@@ -1,8 +1,6 @@
 ![LCE Revelations Banner](.github/LCE-Revelations-banner.png)
 # Legacy Console Edition Revelations
 
-[![Discord](https://img.shields.io/badge/Discord-Join%20Server-5865F2?logo=discord&logoColor=white)](https://discord.gg/vhEHre5sCB)
-
 If you have any questions regarding this fork, this is my Fluxer server (similar to a Discord server):
 <p align="center">
   <a href="https://fluxer.gg/CgS3uFT7">
