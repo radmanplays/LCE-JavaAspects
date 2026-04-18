@@ -65,7 +65,7 @@ public:
 
 private:
 	const int m_max;
-	const int m_maxPerLevel;
+	int m_maxPerLevel;
 	const Material *spawnPositionMaterial;
 	const bool m_isFriendly;
 	const bool m_isPersistent;
@@ -79,6 +79,7 @@ public:
 	const eINSTANCEOF getEnumBaseClass();	// 4J added
 	int getMaxInstancesPerChunk();
 	int getMaxInstancesPerLevel();		// 4J added
+	void setMaxInstancesPerLevel(int max);	// 4J added
 	Material *getSpawnPositionMaterial();
 	bool isFriendly();
 	bool isSingleType();

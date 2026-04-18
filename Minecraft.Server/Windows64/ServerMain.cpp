@@ -37,6 +37,7 @@
 #include "../../Minecraft.World/ConsoleSaveFileOriginal.h"
 #include "../../Minecraft.World/net.minecraft.world.level.tile.h"
 #include "../../Minecraft.World/Random.h"
+#include "../../Minecraft.World/MobCategory.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -557,9 +558,17 @@ int main(int argc, char **argv)
 	{
 		LogError("startup", "Minecraft initialization failed.");
 		CleanupDevice();
-		
+
 		return 3;
 	}
+
+	MobCategory::monster->setMaxInstancesPerLevel(serverProperties.maxMonsters);
+	MobCategory::creature->setMaxInstancesPerLevel(serverProperties.maxAnimals);
+	MobCategory::ambient->setMaxInstancesPerLevel(serverProperties.maxAmbient);
+	MobCategory::waterCreature->setMaxInstancesPerLevel(serverProperties.maxWaterAnimals);
+	MobCategory::creature_wolf->setMaxInstancesPerLevel(serverProperties.maxWolves);
+	MobCategory::creature_chicken->setMaxInstancesPerLevel(serverProperties.maxChickens);
+	MobCategory::creature_mushroomcow->setMaxInstancesPerLevel(serverProperties.maxMushroomCows);
 
 	app.InitGameSettings();
 

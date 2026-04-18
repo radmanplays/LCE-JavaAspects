@@ -58,6 +58,11 @@ int MobCategory::getMaxInstancesPerLevel()	// 4J added
 	return m_maxPerLevel;
 }
 
+void MobCategory::setMaxInstancesPerLevel(int max)
+{
+	m_maxPerLevel = max;
+}
+
 Material *MobCategory::getSpawnPositionMaterial()
 {
 	return (Material *) spawnPositionMaterial;
