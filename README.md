@@ -28,12 +28,20 @@ This project is based on Legacy Console Edition v1.6.0560.0 (TU19) with fixes an
 
 ## Latest:
 
+### Configurable Mob Spawn Caps (Dedicated Server)
+
+- Natural spawn limits are now configurable via `server.properties`. The previously hardcoded limits can be tuned with `max-monsters` (default 50), `max-animals` (50), `max-ambient` (20), `max-water-animals` (5), `max-wolves` (8), `max-chickens` (8), and `max-mushroom-cows` (2). Defaults match the original values so existing servers see no behavior change until you edit the config.
+
 ### Bug Fixes
 
 - Fixed save thumbnails appearing as black icons in the load world menu
 - Fixed hardcore worlds not locking the difficulty slider and gamemode toggle on the load screen
 - Fixed chat color codes (e.g. `§aGreen §cRed`) not displaying colors in singleplayer
+- Fixed apostrophes rendering as `&#39;` in chat after HTML chat rendering was enabled
 - Fixed a crash when opening certain menus (e.g. Edit Server) after leaving exclusive fullscreen at a small window size
+- Fixed pink/white see-through artifacts on distant blocks in windowed mode on some GPU configurations (DWM misinterpreting backbuffer alpha as window transparency)
+- Reduce GPU coil whine on the main menu by forcing VSync when not in-world
+- Fixed duplicate join messages appearing when joining a FourKit server
 
 ### Upstream Merges
 
