@@ -106,6 +106,8 @@ typedef int(__stdcall *fn_fire_block_from_to)(int dimId, int fromX, int fromY, i
 typedef void(__stdcall *fn_set_chunk_callbacks)(void *isChunkLoaded, void *loadChunk, void *unloadChunk, void *getLoadedChunks, void *isChunkInUse, void *getChunkSnapshot, void *unloadChunkRequest, void *regenerateChunk, void *refreshChunk);
 typedef void(__stdcall *fn_set_block_info_callbacks)(void *getSkyLight, void *getBlockLight, void *getBiomeId, void *setBiomeId);
 typedef void(__stdcall *fn_set_world_entity_callbacks)(void *getWorldEntities, void *getChunkEntities);
+typedef void(__stdcall *fn_set_subscription_callbacks)(void *setHandlerMask);
+typedef void(__stdcall *fn_set_server_callbacks)(void *getServerTickCount);
 typedef void(__stdcall *fn_fire_chunk_load)(int dimId, int chunkX, int chunkZ, int isNewChunk);
 typedef int(__stdcall *fn_fire_chunk_unload)(int dimId, int chunkX, int chunkZ);
 
@@ -168,6 +170,8 @@ static fn_fire_block_from_to s_managedFireBlockFromTo = nullptr;
 static fn_set_chunk_callbacks s_managedSetChunkCallbacks = nullptr;
 static fn_set_block_info_callbacks s_managedSetBlockInfoCallbacks = nullptr;
 static fn_set_world_entity_callbacks s_managedSetWorldEntityCallbacks = nullptr;
+static fn_set_subscription_callbacks s_managedSetSubscriptionCallbacks = nullptr;
+static fn_set_server_callbacks s_managedSetServerCallbacks = nullptr;
 static fn_fire_chunk_load s_managedFireChunkLoad = nullptr;
 static fn_fire_chunk_unload s_managedFireChunkUnload = nullptr;
 
@@ -255,6 +259,8 @@ void Initialize()
         {L"SetChunkCallbacks", (void **)&s_managedSetChunkCallbacks},
         {L"SetBlockInfoCallbacks", (void **)&s_managedSetBlockInfoCallbacks},
         {L"SetWorldEntityCallbacks", (void **)&s_managedSetWorldEntityCallbacks},
+        {L"SetSubscriptionCallbacks", (void **)&s_managedSetSubscriptionCallbacks},
+        {L"SetServerCallbacks", (void **)&s_managedSetServerCallbacks},
         {L"FireChunkLoad", (void **)&s_managedFireChunkLoad},
         {L"FireChunkUnload", (void **)&s_managedFireChunkUnload},
     };
@@ -375,6 +381,12 @@ void Initialize()
     s_managedSetWorldEntityCallbacks(
         (void *)&NativeGetWorldEntities,
         (void *)&NativeGetChunkEntities);
+
+    s_managedSetSubscriptionCallbacks(
+        (void *)&NativeSetHandlerMask);
+
+    s_managedSetServerCallbacks(
+        (void *)&NativeGetServerTickCount);
 
     LogInfo("fourkit", "FourKit initialized successfully.");
 }
@@ -521,8 +533,12 @@ bool FirePlayerMove(int entityId,
                     double toX, double toY, double toZ,
                     double *outToX, double *outToY, double *outToZ)
 {
-    if (!s_initialized || !s_managedFireMove)
+    // Caller reads outTo* unconditionally; init on every early-return.
+    if (!s_initialized || !s_managedFireMove || !HasHandlers(kHandlerKind_PlayerMove))
     {
+        *outToX = toX;
+        *outToY = toY;
+        *outToZ = toZ;
         return false;
     }
 
@@ -1059,12 +1075,16 @@ void FireChunkLoad(int dimId, int chunkX, int chunkZ, bool isNewChunk)
 {
     if (!s_initialized || !s_managedFireChunkLoad)
         return;
+    if (!HasHandlers(kHandlerKind_ChunkLoad))
+        return;
     s_managedFireChunkLoad(dimId, chunkX, chunkZ, isNewChunk ? 1 : 0);
 }
 
 bool FireChunkUnload(int dimId, int chunkX, int chunkZ)
 {
     if (!s_initialized || !s_managedFireChunkUnload)
+        return false;
+    if (!HasHandlers(kHandlerKind_ChunkUnload))
         return false;
     return s_managedFireChunkUnload(dimId, chunkX, chunkZ) != 0;
 }

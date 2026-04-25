@@ -3,6 +3,7 @@
 #include "Common/StringUtils.h"
 #include "stdafx.h"
 
+#include <atomic>
 #include <string>
 #include <vector>
 
@@ -50,6 +51,8 @@
 
 namespace
 {
+
+std::atomic<uint32_t> g_handlerMask{0};
 
 static shared_ptr<ServerPlayer> FindPlayer(int entityId)
 {
@@ -109,6 +112,24 @@ class VirtualContainer : public SimpleContainer
 
 namespace FourKitBridge
 {
+
+void __cdecl NativeSetHandlerMask(uint32_t mask)
+{
+    g_handlerMask.store(mask, std::memory_order_release);
+}
+
+bool HasHandlers(int kind)
+{
+    if (kind < 0 || kind >= 32) return false;
+    return (g_handlerMask.load(std::memory_order_acquire) & (1u << kind)) != 0;
+}
+
+int __cdecl NativeGetServerTickCount()
+{
+    MinecraftServer *srv = MinecraftServer::getInstance();
+    return srv ? srv->tickCount : 0;
+}
+
 void __cdecl NativeDamagePlayer(int entityId, float amount)
 {
     auto player = FindPlayer(entityId);

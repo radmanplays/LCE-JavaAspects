@@ -236,6 +236,15 @@ internal static class NativeBridge
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     internal delegate void NativeSetBiomeIdDelegate(int dimId, int x, int z, int biomeId);
+
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    internal delegate void NativeSetHandlerMaskDelegate(uint mask);
+    internal static NativeSetHandlerMaskDelegate? SetHandlerMask;
+
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    internal delegate int NativeGetServerTickCountDelegate();
+    internal static NativeGetServerTickCountDelegate? GetServerTickCount;
+
     internal static NativeDamageDelegate? DamagePlayer;
     internal static NativeSetHealthDelegate? SetPlayerHealth;
     internal static NativeTeleportDelegate? TeleportPlayer;
@@ -438,5 +447,15 @@ internal static class NativeBridge
         GetBlockLight = Marshal.GetDelegateForFunctionPointer<NativeGetBlockLightDelegate>(getBlockLight);
         GetBiomeId = Marshal.GetDelegateForFunctionPointer<NativeGetBiomeIdDelegate>(getBiomeId);
         SetBiomeId = Marshal.GetDelegateForFunctionPointer<NativeSetBiomeIdDelegate>(setBiomeId);
+    }
+
+    internal static void SetSubscriptionCallbacks(IntPtr setHandlerMask)
+    {
+        SetHandlerMask = Marshal.GetDelegateForFunctionPointer<NativeSetHandlerMaskDelegate>(setHandlerMask);
+    }
+
+    internal static void SetServerCallbacks(IntPtr getServerTickCount)
+    {
+        GetServerTickCount = Marshal.GetDelegateForFunctionPointer<NativeGetServerTickCountDelegate>(getServerTickCount);
     }
 }

@@ -160,4 +160,32 @@ public static partial class FourKitHost
             ServerLog.Error("fourkit", $"SetWorldEntityCallbacks error: {ex}");
         }
     }
+
+    [UnmanagedCallersOnly]
+    public static void SetSubscriptionCallbacks(IntPtr setHandlerMask)
+    {
+        try
+        {
+            NativeBridge.SetSubscriptionCallbacks(setHandlerMask);
+            // Flush the mask accumulated during plugin onEnable.
+            FourKit.ResyncHandlerMask();
+        }
+        catch (Exception ex)
+        {
+            ServerLog.Error("fourkit", $"SetSubscriptionCallbacks error: {ex}");
+        }
+    }
+
+    [UnmanagedCallersOnly]
+    public static void SetServerCallbacks(IntPtr getServerTickCount)
+    {
+        try
+        {
+            NativeBridge.SetServerCallbacks(getServerTickCount);
+        }
+        catch (Exception ex)
+        {
+            ServerLog.Error("fourkit", $"SetServerCallbacks error: {ex}");
+        }
+    }
 }

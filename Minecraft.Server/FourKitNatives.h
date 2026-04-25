@@ -1,8 +1,21 @@
 #pragma once
 
+#include <cstdint>
 
 namespace FourKitBridge
 {
+    // Must match HandlerKind in FourKit.cs.
+    enum HandlerKind : int {
+        kHandlerKind_ChunkLoad   = 0,
+        kHandlerKind_ChunkUnload = 1,
+        kHandlerKind_PlayerMove  = 2,
+    };
+
+    void __cdecl NativeSetHandlerMask(uint32_t mask);
+    bool HasHandlers(int kind);
+
+    int __cdecl NativeGetServerTickCount();
+
     // core
     void __cdecl NativeDamagePlayer(int entityId, float amount);
     void __cdecl NativeSetPlayerHealth(int entityId, float health);

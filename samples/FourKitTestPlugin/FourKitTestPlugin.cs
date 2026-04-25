@@ -36,16 +36,21 @@ public class FourKitTestPlugin : ServerPlugin
         _logPath = ResolveLogPath(serverDirectory, dataDirectory);
         Log("FourKitTestPlugin enabled.");
         Log($"Plugin log file: {_logPath}");
-        FourKit.addListener(new ChunkEventLogger());
+        // ChunkEventLogger is intentionally NOT registered here. Subscribing
+        // to chunk events flips the C++ HasHandlers mask bit, which disables
+        // the no-listener fast-path. Use /fktest hookchunks to register it
+        // when you want to measure dispatch overhead specifically.
+        TpsProbe.Start();
 
         var cmd = FourKit.getCommand("fktest");
         cmd.setDescription("FourKit API smoke tests.");
-        cmd.setUsage("/fktest <help|world|chunks|snapshot|entities|loadchunk|enderchest|disenchant|events|setblock|chatcolor>");
+        cmd.setUsage("/fktest <help|world|chunks|snapshot|entities|loadchunk|enderchest|disenchant|events|setblock|chatcolor|tps|scatter|hookchunks|watchchunks>");
         cmd.setExecutor(new TestExecutor());
     }
 
     public override void onDisable()
     {
+        TpsProbe.Stop();
         Log("FourKitTestPlugin disabled.");
     }
 
@@ -53,6 +58,9 @@ public class FourKitTestPlugin : ServerPlugin
     internal static int ChunkUnloadCount => _chunkUnloadCount;
     internal static void IncChunkLoad() => Interlocked.Increment(ref _chunkLoadCount);
     internal static void IncChunkUnload() => Interlocked.Increment(ref _chunkUnloadCount);
+
+    internal static volatile bool WatchChunks = false;
+    internal static volatile bool ChunkListenerHooked = false;
 
     /// <summary>
     /// Writes a line both to the live server console and to a persistent log
@@ -105,12 +113,93 @@ public class FourKitTestPlugin : ServerPlugin
     }
 }
 
+internal static class TpsProbe
+{
+    private static readonly object _lock = new();
+    private static readonly LinkedList<(double elapsed, int tick)> _samples = new();
+    private static System.Threading.Timer? _timer;
+    private static System.Diagnostics.Stopwatch? _sw;
+
+    public static void Start()
+    {
+        _sw = System.Diagnostics.Stopwatch.StartNew();
+        // Seed an initial sample so a /fktest tps in the first second is meaningful.
+        Sample();
+        _timer = new System.Threading.Timer(_ => Sample(), null, 1000, 1000);
+    }
+
+    public static void Stop()
+    {
+        _timer?.Dispose();
+        _timer = null;
+        _sw?.Stop();
+        _sw = null;
+        lock (_lock) _samples.Clear();
+    }
+
+    private static void Sample()
+    {
+        var sw = _sw;
+        if (sw == null) return;
+        try
+        {
+            int tick = FourKit.getServerTick();
+            double elapsed = sw.Elapsed.TotalSeconds;
+            lock (_lock)
+            {
+                _samples.AddLast((elapsed, tick));
+                // Keep a 65s window so the 60s average has full data.
+                while (_samples.Count > 66) _samples.RemoveFirst();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[fkplugin] TpsProbe sample error: {ex.Message}");
+        }
+    }
+
+    public static (int samples, double tps1, double tps5, double tps30, double tps60) Read()
+    {
+        (double elapsed, int tick)[] arr;
+        lock (_lock)
+        {
+            if (_samples.Count < 2) return (_samples.Count, 0, 0, 0, 0);
+            arr = _samples.ToArray();
+        }
+
+        var last = arr[^1];
+
+        double Window(double seconds)
+        {
+            for (int j = arr.Length - 2; j >= 0; j--)
+            {
+                if (last.elapsed - arr[j].elapsed >= seconds)
+                {
+                    var first = arr[j];
+                    double dt = last.elapsed - first.elapsed;
+                    return dt > 0 ? (last.tick - first.tick) / dt : 0;
+                }
+            }
+            // Not enough history yet: report what we have.
+            var oldest = arr[0];
+            double dt0 = last.elapsed - oldest.elapsed;
+            return dt0 > 0 ? (last.tick - oldest.tick) / dt0 : 0;
+        }
+
+        return (arr.Length, Window(1), Window(5), Window(30), Window(60));
+    }
+}
+
+// Chunk events fire at high frequency under load (16 chunks/player/tick on
+// the dedicated server). Doing disk I/O per event tanks server TPS. Default
+// to counter-only; /fktest watchchunks toggles verbose disk logging on.
 internal sealed class ChunkEventLogger : Listener
 {
     [EventHandler(Priority = EventPriority.Monitor)]
     public void onChunkLoad(ChunkLoadEvent e)
     {
         FourKitTestPlugin.IncChunkLoad();
+        if (!FourKitTestPlugin.WatchChunks) return;
         var chunk = e.getChunk();
         FourKitTestPlugin.Log($"ChunkLoadEvent dim={chunk.getWorld().getDimensionId()} ({chunk.getX()},{chunk.getZ()}) new={e.isNewChunk()}");
     }
@@ -119,6 +208,7 @@ internal sealed class ChunkEventLogger : Listener
     public void onChunkUnload(ChunkUnloadEvent e)
     {
         FourKitTestPlugin.IncChunkUnload();
+        if (!FourKitTestPlugin.WatchChunks) return;
         var chunk = e.getChunk();
         FourKitTestPlugin.Log($"ChunkUnloadEvent dim={chunk.getWorld().getDimensionId()} ({chunk.getX()},{chunk.getZ()})");
     }
@@ -136,7 +226,7 @@ internal sealed class TestExecutor : CommandExecutor
     {
         if (args.Length == 0)
         {
-            Reply(sender,"Usage: /fktest <help|world|chunks|snapshot|entities|loadchunk|enderchest|disenchant|events|setblock|chatcolor>");
+            Reply(sender,"Usage: /fktest <help|world|chunks|snapshot|entities|loadchunk|enderchest|disenchant|events|setblock|chatcolor|tps|scatter|hookchunks|watchchunks>");
             return true;
         }
 
@@ -154,6 +244,22 @@ internal sealed class TestExecutor : CommandExecutor
                 case "disenchant": return TestDisenchant(sender);
                 case "setblock": return TestSetBlock(sender);
                 case "chatcolor": return TestChatColor(sender);
+                case "tps": return TestTps(sender);
+                case "scatter": return TestScatter(sender, args);
+                case "hookchunks":
+                    if (FourKitTestPlugin.ChunkListenerHooked)
+                    {
+                        Reply(sender, "Chunk listener already hooked. EventDispatcher has no unregister, so this is one-way for the session.");
+                        return true;
+                    }
+                    FourKit.addListener(new ChunkEventLogger());
+                    FourKitTestPlugin.ChunkListenerHooked = true;
+                    Reply(sender, "Chunk listener registered. HasHandlers fast-path now off; chunk events will dispatch.");
+                    return true;
+                case "watchchunks":
+                    FourKitTestPlugin.WatchChunks = !FourKitTestPlugin.WatchChunks;
+                    Reply(sender, $"Verbose chunk-event disk logging {(FourKitTestPlugin.WatchChunks ? "ON" : "OFF")} (only effective once /fktest hookchunks is run)");
+                    return true;
                 case "events":
                     Reply(sender,$"Chunk loads observed: {FourKitTestPlugin.ChunkLoadCount}");
                     Reply(sender,$"Chunk unloads observed: {FourKitTestPlugin.ChunkUnloadCount}");
@@ -184,6 +290,10 @@ internal sealed class TestExecutor : CommandExecutor
         Reply(sender,"/fktest events      - Show observed chunk-event counters");
         Reply(sender,"/fktest setblock    - Place wool 3 above head via setTypeIdAndData, read back");
         Reply(sender,"/fktest chatcolor   - Verify ChatColor parsing/strip/translate");
+        Reply(sender,"/fktest tps         - Show server TPS over 1s/5s/30s/60s windows");
+        Reply(sender,"/fktest scatter [N] - Teleport every online player to a random point within +-N blocks (default 1500)");
+        Reply(sender,"/fktest hookchunks  - Register the chunk listener (turns OFF the no-listener fast-path)");
+        Reply(sender,"/fktest watchchunks - Toggle per-event disk logging (off by default; expensive)");
     }
 
     private static Player? RequirePlayer(CommandSender sender)
@@ -191,6 +301,54 @@ internal sealed class TestExecutor : CommandExecutor
         if (sender is Player p) return p;
         Reply(sender,"This subcommand must be run by a player.");
         return null;
+    }
+
+    private static bool TestScatter(CommandSender sender, string[] args)
+    {
+        int range = 1500;
+        if (args.Length > 1 && int.TryParse(args[1], out int parsed) && parsed > 0)
+            range = parsed;
+
+        var world = FourKit.getWorld(0);
+        if (world == null)
+        {
+            Reply(sender, "Could not resolve overworld.");
+            return true;
+        }
+
+        var rng = new Random();
+        int count = 0;
+        foreach (var p in FourKit.getOnlinePlayers())
+        {
+            int x = rng.Next(-range, range + 1);
+            int z = rng.Next(-range, range + 1);
+            int y = world.getHighestBlockYAt(x, z) + 1;
+            try
+            {
+                p.teleport(new Location(world, x, y, z));
+                count++;
+            }
+            catch (Exception ex)
+            {
+                FourKitTestPlugin.Log($"scatter: failed to teleport {p.getName()}: {ex.Message}");
+            }
+        }
+        Reply(sender, $"Scattered {count} player(s) within ±{range} blocks.");
+        return true;
+    }
+
+    private static bool TestTps(CommandSender sender)
+    {
+        var (samples, t1, t5, t30, t60) = TpsProbe.Read();
+        if (samples < 2)
+        {
+            Reply(sender, $"TPS probe warming up ({samples}/2 samples). Try again in a few seconds.");
+            return true;
+        }
+        int tick = FourKit.getServerTick();
+        Reply(sender, $"TPS  1s={t1:F2}  5s={t5:F2}  30s={t30:F2}  60s={t60:F2}");
+        Reply(sender, $"server tick={tick}  samples={samples}");
+        return true;
     }
 
     private static bool TestWorld(CommandSender sender)
