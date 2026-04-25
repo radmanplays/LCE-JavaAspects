@@ -28,6 +28,11 @@ This project is based on Legacy Console Edition v1.6.0560.0 (TU19) with fixes an
 
 ## Latest:
 
+### FourKit Performance Fix (Dedicated Server)
+
+- Fixed memory bloat and lag on FourKit dedicated servers running more than a handful of players. Recent additions were doing extra work for every chunk loaded and unloaded around every player, even when no plugin needed it. With many players moving around, that overhead piled up fast and dragged the tick rate down.
+- The server now skips that work entirely when no plugin is listening for chunk events, so memory stays flatter and the server stays smooth at higher player counts. No config change needed.
+
 ### Configurable Mob Spawn Caps (Dedicated Server)
 
 - Natural spawn limits are now configurable via `server.properties`. The previously hardcoded limits can be tuned with `max-monsters` (default 50), `max-animals` (50), `max-ambient` (20), `max-water-animals` (5), `max-wolves` (8), `max-chickens` (8), and `max-mushroom-cows` (2). Defaults match the original values so existing servers see no behavior change until you edit the config.
