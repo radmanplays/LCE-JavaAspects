@@ -1,0 +1,40 @@
+services:
+  lce-revelations-dedicated-server-fourkit:
+    build:
+      context: .
+      dockerfile: docker/dedicated-server/Dockerfile
+      args:
+        # Bakes the FourKit-enabled server flavour with bundled .NET 10 runtime
+        # and an empty plugins/ folder. EXPERIMENTAL: hosting CoreCLR through
+        # Wine has not been thoroughly validated; run the TpsPlugin and verify
+        # the host loads before relying on this image in production.
+        MC_RUNTIME_DIR: ${MC_RUNTIME_DIR:-build/windows64/Minecraft.Server.FourKit/Release}
+    container_name: lce-revelations-dedicated-server-fourkit
+    restart: unless-stopped
+    tty: true
+    stdin_open: true
+    environment:
+      TZ: ${TZ:-Etc/UTC}
+      WINEARCH: win64
+      WINEPREFIX: /var/opt/wineprefix64
+      WINEDEBUG: -all
+      # linux require use file stdin
+      SERVER_CLI_INPUT_MODE: ${SERVER_CLI_INPUT_MODE:-stream}
+      # minimum required virtual screen
+      XVFB_DISPLAY: ${XVFB_DISPLAY:-:99}
+      XVFB_SCREEN: ${XVFB_SCREEN:-720x1280x16}
+      # ip & port the server will run on
+      SERVER_BIND_IP: ${SERVER_BIND_IP:-0.0.0.0}
+      SERVER_PORT: ${SERVER_PORT:-25565}
+    volumes:
+      # - wineprefix64:/var/opt/wineprefix64
+      - ./server-data:/srv/persist
+      # Drop plugin DLLs into ./plugins on the host to load them at startup
+      - ./plugins:/srv/mc/plugins
+    ports:
+      - "$SERVER_PORT:$SERVER_PORT/tcp"
+      - "$SERVER_PORT:$SERVER_PORT/udp"
+    stop_grace_period: 30s
+
+# volumes:
+#   wineprefix64:
