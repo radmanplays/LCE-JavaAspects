@@ -77,6 +77,7 @@ public:
 	void AddDLCSkinsToMemTextures();
 public:
 	void renderEntities(Vec3 *cam, Culler *culler, float a);
+	void renderBeaconBeams(float a);
 	wstring gatherStats1();
 	wstring gatherStats2();
 private:

@@ -1558,6 +1558,10 @@ void GameRenderer::renderLevel(float a, int64_t until)
 			PIXEndNamedEvent();
 		}
 
+		PIXBeginNamedEvent(0,"Beacon beam halo (after water)");
+		levelRenderer->renderBeaconBeams(a);
+		PIXEndNamedEvent();
+
 		// 4J - added - have split out translucent particle rendering so that it happens after the water is rendered, primarily for fireworks
 		PIXBeginNamedEvent(0,"Particle render (translucent)");
 		Lighting::turnOn();

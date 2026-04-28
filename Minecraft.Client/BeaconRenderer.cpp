@@ -6,6 +6,8 @@
 
 ResourceLocation BeaconRenderer::BEAM_LOCATION = ResourceLocation(TN_MISC_BEACON_BEAM);
 
+bool BeaconRenderer::s_renderOuterHalo = false;
+
 void BeaconRenderer::render(shared_ptr<TileEntity> _beacon, double x, double y, double z, float a, bool setColor, float alpha, bool useCompiled)
 {
 	shared_ptr<BeaconTileEntity> beacon = dynamic_pointer_cast<BeaconTileEntity>(_beacon);
@@ -18,21 +20,18 @@ void BeaconRenderer::render(shared_ptr<TileEntity> _beacon, double x, double y, 
 
 		bindTexture(&BEAM_LOCATION);
 
-		// TODO: 4J: Put this back in
-		//assert(0);
-		//glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		//glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
 		glDisable(GL_LIGHTING);
 		glDisable(GL_CULL_FACE);
-		glDisable(GL_BLEND);
-		glDepthMask(true);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 
 		float tt = beacon->getLevel()->getGameTime() + a;
 		float texVOff = -tt * .20f - floor(-tt * .10f);
 
+		if (!s_renderOuterHalo)
 		{
+			glDisable(GL_BLEND);
+			glDepthMask(true);
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+
 			int r = 1;
 
 			double rot = tt * .025 * (1 - (r & 1) * 2.5);
@@ -73,20 +72,20 @@ void BeaconRenderer::render(shared_ptr<TileEntity> _beacon, double x, double y, 
 			t->vertexUV(x + enx, y, z + enz, uu2, vv2);
 			t->vertexUV(x + esx, y, z + esz, uu1, vv2);
 			t->vertexUV(x + esx, y + top, z + esz, uu1, vv1);
-				
+
 			t->vertexUV(x + wsx, y + top, z + wsz, uu2, vv1);
 			t->vertexUV(x + wsx, y, z + wsz, uu2, vv2);
 			t->vertexUV(x + wnx, y, z + wnz, uu1, vv2);
 			t->vertexUV(x + wnx, y + top, z + wnz, uu1, vv1);
-				
+
 			t->end();
 		}
-
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		glDepthMask(false);
-
+		else
 		{
+			glEnable(GL_BLEND);
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			glDepthMask(false);
+
 			t->begin();
 			t->color(255, 255, 255, 32);
 
@@ -111,22 +110,22 @@ void BeaconRenderer::render(shared_ptr<TileEntity> _beacon, double x, double y, 
 			t->vertexUV(x + wnx, y, z + wnz, uu2, vv2);
 			t->vertexUV(x + enx, y, z + enz, uu1, vv2);
 			t->vertexUV(x + enx, y + top, z + enz, uu1, vv1);
-				
+
 			t->vertexUV(x + esx, y + top, z + esz, uu2, vv1);
 			t->vertexUV(x + esx, y, z + esz, uu2, vv2);
 			t->vertexUV(x + wsx, y, z + wsz, uu1, vv2);
 			t->vertexUV(x + wsx, y + top, z + wsz, uu1, vv1);
-				
+
 			t->vertexUV(x + enx, y + top, z + enz, uu2, vv1);
 			t->vertexUV(x + enx, y, z + enz, uu2, vv2);
 			t->vertexUV(x + esx, y, z + esz, uu1, vv2);
 			t->vertexUV(x + esx, y + top, z + esz, uu1, vv1);
-				
+
 			t->vertexUV(x + wsx, y + top, z + wsz, uu2, vv1);
 			t->vertexUV(x + wsx, y, z + wsz, uu2, vv2);
 			t->vertexUV(x + wnx, y, z + wnz, uu1, vv2);
 			t->vertexUV(x + wnx, y + top, z + wnz, uu1, vv1);
-				
+
 			t->end();
 		}
 

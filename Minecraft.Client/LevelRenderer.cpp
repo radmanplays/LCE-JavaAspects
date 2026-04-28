@@ -6,6 +6,7 @@
 #include "Chunk.h"
 #include "EntityRenderDispatcher.h"
 #include "TileEntityRenderDispatcher.h"
+#include "BeaconRenderer.h"
 #include "DistanceChunkSorter.h"
 #include "DirtyChunkSorter.h"
 #include "MobSkinTextureProcessor.h"
@@ -651,6 +652,30 @@ void LevelRenderer::renderEntities(Vec3 *cam, Culler *culler, float a)
 	LeaveCriticalSection(&m_csRenderableTileEntities);
 
 	mc->gameRenderer->turnOffLightLayer(a);		// 4J - brought forward from 1.8.2
+}
+
+void LevelRenderer::renderBeaconBeams(float a)
+{
+	if (mc == nullptr || mc->player == nullptr) return;
+
+	int playerIndex = mc->player->GetXboxPad();
+	if (level[playerIndex] == nullptr) return;
+
+	BeaconRenderer::s_renderOuterHalo = true;
+
+	EnterCriticalSection(&m_csRenderableTileEntities);
+	for (auto & it : renderableTileEntities)
+	{
+		if (!isGlobalIndexInSameDimension(it.first, level[playerIndex])) continue;
+		for (auto& te : it.second)
+		{
+			if (te->GetType() != eTYPE_BEACONTILEENTITY) continue;
+			TileEntityRenderDispatcher::instance->render(te, a);
+		}
+	}
+	LeaveCriticalSection(&m_csRenderableTileEntities);
+
+	BeaconRenderer::s_renderOuterHalo = false;
 }
 
 wstring LevelRenderer::gatherStats1()
