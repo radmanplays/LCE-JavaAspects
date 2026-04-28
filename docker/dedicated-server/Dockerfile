@@ -2,15 +2,10 @@ FROM debian:bookworm-slim
 
 ARG DEBIAN_FRONTEND=noninteractive
 # Build the server with CMake first (see COMPILE.md). The build context is
-# the repo root, and the path below points at the **vanilla** server's Release
-# output. The vanilla flavour is shipped because it has no .NET dependency
-# and runs reliably under Wine.
-#
-# A FourKit-enabled image is intentionally NOT built here yet: hosting the
-# .NET 10 self-contained runtime through Wine has not been smoke-tested.
-# Once it's validated, this Dockerfile can be extended (or split into a
-# second variant) to bake in the runtime/ and plugins/ folders from
-# build/windows64/Minecraft.Server.FourKit/Release.
+# the repo root, and MC_RUNTIME_DIR should point at a Release output that
+# contains Minecraft.Server.exe, iggy_w64.dll, Common/, and Windows64/. For
+# the FourKit flavour the same directory will also contain runtime/ and
+# plugins/; the wildcard COPY below picks them up automatically.
 ARG MC_RUNTIME_DIR=build/windows64/Minecraft.Server/Release
 
 RUN dpkg --add-architecture i386 \
@@ -29,10 +24,7 @@ ENV WINEPREFIX=/var/opt/wineprefix64
 
 WORKDIR /srv/mc
 
-COPY ${MC_RUNTIME_DIR}/Minecraft.Server.exe /srv/mc/Minecraft.Server.exe
-COPY ${MC_RUNTIME_DIR}/iggy_w64.dll /srv/mc/iggy_w64.dll
-COPY ${MC_RUNTIME_DIR}/Common /srv/mc/Common
-COPY ${MC_RUNTIME_DIR}/Windows64 /srv/mc/Windows64
+COPY ${MC_RUNTIME_DIR}/ /srv/mc/
 COPY docker/dedicated-server/entrypoint.sh /usr/local/bin/entrypoint.sh
 
 RUN chmod 0755 /usr/local/bin/entrypoint.sh \

@@ -7,6 +7,7 @@ permissions:
   contents: write
   id-token: write
   attestations: write
+  packages: write
 
 concurrency:
   group: nightly
@@ -203,6 +204,76 @@ jobs:
         name: server-build
         path: staging/*
 
+  docker:
+    name: Build Docker (${{ matrix.variant }})
+    needs: build-server
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: vanilla
+            zip: LCE-Revelations-Server-Win64.zip
+            subdir: LCE-Revelations-Server-Win64
+            image: lce-revelations-dedicated-server
+          - variant: fourkit
+            zip: LCE-Revelations-Server-Win64-FourKit.zip
+            subdir: LCE-Revelations-Server-Win64-FourKit
+            image: lce-revelations-dedicated-server-fourkit
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+
+    - name: Download server artifacts
+      uses: actions/download-artifact@v7
+      with:
+        name: server-build
+        path: .artifacts/
+
+    - name: Prepare runtime directory
+      shell: bash
+      run: |
+        set -euo pipefail
+        rm -rf runtime .extracted
+        unzip -q ".artifacts/${{ matrix.zip }}" -d .extracted
+        mv ".extracted/${{ matrix.subdir }}" runtime
+        # Strip debug symbols to keep image small (zip includes .pdb).
+        find runtime -name '*.pdb' -delete
+
+    - name: Compute image name
+      id: image
+      shell: bash
+      run: |
+        owner="$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
+        echo "image=ghcr.io/$owner/${{ matrix.image }}" >> "$GITHUB_OUTPUT"
+
+    - name: Extract Docker metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ steps.image.outputs.image }}
+        tags: |
+          type=raw,value=nightly
+
+    - name: Login to GHCR
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and push image
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        file: docker/dedicated-server/Dockerfile
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        build-args: |
+          MC_RUNTIME_DIR=runtime
+
   release-server:
     name: Release Server
     needs: build-server
@@ -361,7 +432,7 @@ jobs:
           --notes-file notes.md
 
   cleanup:
-    needs: [release-client, release-server]
+    needs: [release-client, release-server, docker]
     if: always()
     runs-on: ubuntu-latest
     steps:
