@@ -317,7 +317,7 @@ proxy-protocol=true
 - Dedicated server is fully compatible with `smartcmd/MinecraftConsoles` clients, even with hardcore mode
 - Client (`LCE-Revelations-Client-Win64.zip`): download from the Nightly release on GitHub
 - Dedicated Server (`LCE-Revelations-Server-Win64.zip`): download from the Nightly-Dedicated-Server release on GitHub
-- Docker: pull `ghcr.io/itsrevela/lce-revelations-dedicated-server:nightly` for server container
+- Docker: pull `ghcr.io/itsrevela/lce-revelations-dedicated-server:nightly` (vanilla) or `ghcr.io/itsrevela/lce-revelations-dedicated-server-fourkit:nightly` (FourKit plugin host) for the server container
 
 ### Screenshot Functionality
 
@@ -482,38 +482,48 @@ Minecraft.Server.exe -seed 123456789
 
 ## Dedicated Server in Docker (Wine)
 
-This repository includes a lightweight Docker setup for running the Windows dedicated server under Wine.
+This repository includes a lightweight Docker setup for running the Windows dedicated server under Wine. Two flavours are published:
+
+- **Vanilla** (`ghcr.io/itsrevela/lce-revelations-dedicated-server:nightly`): smallest image, no plugin host.
+- **FourKit** (`ghcr.io/itsrevela/lce-revelations-dedicated-server-fourkit:nightly`): bundles the .NET 10 plugin host so plugins dropped into `plugins/` are loaded at startup.
+
+Both images are rebuilt by the nightly workflow.
+
 ### Quick Start (No Build, Recommended)
 
 No local build is required. The container image is pulled from GHCR.
 
 ```bash
+# Vanilla (default helper script)
 ./start-dedicated-server.sh
-```
 
-`start-dedicated-server.sh` does the following:
-- uses `docker-compose.dedicated-server.ghcr.yml`
-- pulls latest image, then starts the container
-
-If you want to skip pulling and just start:
-
-```bash
+# Pass --no-pull to skip the GHCR pull step
 ./start-dedicated-server.sh --no-pull
 ```
 
-Equivalent manual command:
+The helper script wraps `docker-compose.dedicated-server.ghcr.yml`. To run the FourKit flavour use the FourKit compose file directly:
 
 ```bash
+# Vanilla (manual)
 docker compose -f docker-compose.dedicated-server.ghcr.yml up -d
+
+# FourKit
+docker compose -f docker-compose.dedicated-server.fourkit.ghcr.yml up -d
 ```
 
 ### Local Build Mode (Optional)
 
-Use this only when you want to run your own locally built `Minecraft.Server` binary in Docker.
-**A local build of `Minecraft.Server` is required for this mode.**
+Use this only when you want to run your own locally built server binary in Docker.
+**A local build of `Minecraft.Server` (or `Minecraft.Server.FourKit`) is required for this mode.**
 
 ```bash
-docker compose -f docker-compose.dedicated-server.yml up -d --build
+# Vanilla
+./docker-build-dedicated-server.sh
+docker compose -f docker-compose.dedicated-server.yml up -d
+
+# FourKit
+./docker-build-dedicated-server-fourkit.sh
+docker compose -f docker-compose.dedicated-server.fourkit.yml up -d
 ```
 
 Useful environment variables:
