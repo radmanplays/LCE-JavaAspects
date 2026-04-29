@@ -121,6 +121,45 @@ void PlayerList::queueDisconnect(shared_ptr<ServerPlayer> player, int reason, co
 	LeaveCriticalSection(&m_disconnectCS);
 }
 
+void PlayerList::drainPendingDisconnects()
+{
+	std::deque<PendingDisconnect> dcCopy;
+	EnterCriticalSection(&m_disconnectCS);
+	dcCopy.swap(m_pendingDisconnects);
+	LeaveCriticalSection(&m_disconnectCS);
+
+	while (!dcCopy.empty())
+	{
+		PendingDisconnect pd = dcCopy.front();
+		dcCopy.pop_front();
+
+		server->getPlayers()->removePlayerFromReceiving(pd.player);
+		if (pd.player->connection != nullptr)
+		{
+			pd.player->connection->send(std::make_shared<DisconnectPacket>(static_cast<DisconnectPacket::eDisconnectReason>(pd.reason)));
+			pd.player->connection->connection->sendAndQuit();
+		}
+
+		if (!pd.kickMessage.empty())
+		{
+			broadcastAll(std::make_shared<ChatPacket>(pd.kickMessage));
+		}
+		else if (!pd.fourKitHandledQuit)
+		{
+			if (pd.wasKicked)
+			{
+				broadcastAll(std::make_shared<ChatPacket>(pd.player->name, ChatPacket::e_ChatPlayerKickedFromGame));
+			}
+			else
+			{
+				broadcastAll(std::make_shared<ChatPacket>(pd.player->name, ChatPacket::e_ChatPlayerLeftGame));
+			}
+		}
+
+		remove(pd.player);
+	}
+}
+
 bool PlayerList::placeNewPlayer(Connection *connection, shared_ptr<ServerPlayer> player, shared_ptr<LoginPacket> packet)
 {
 	CompoundTag *playerTag = load(player);
@@ -1300,43 +1339,7 @@ void PlayerList::tick()
 
 	// Drain the pending disconnect queue. disconnect() enqueues here so it
 	// can release done_cs before the heavy cleanup runs on the tick thread.
-	{
-		std::deque<PendingDisconnect> dcCopy;
-		EnterCriticalSection(&m_disconnectCS);
-		dcCopy.swap(m_pendingDisconnects);
-		LeaveCriticalSection(&m_disconnectCS);
-
-		while (!dcCopy.empty())
-		{
-			PendingDisconnect pd = dcCopy.front();
-			dcCopy.pop_front();
-
-			server->getPlayers()->removePlayerFromReceiving(pd.player);
-			if (pd.player->connection != nullptr)
-			{
-				pd.player->connection->send(std::make_shared<DisconnectPacket>(static_cast<DisconnectPacket::eDisconnectReason>(pd.reason)));
-				pd.player->connection->connection->sendAndQuit();
-			}
-
-			if (!pd.kickMessage.empty())
-			{
-				broadcastAll(std::make_shared<ChatPacket>(pd.kickMessage));
-			}
-			else if (!pd.fourKitHandledQuit)
-			{
-				if (pd.wasKicked)
-				{
-					broadcastAll(std::make_shared<ChatPacket>(pd.player->name, ChatPacket::e_ChatPlayerKickedFromGame));
-				}
-				else
-				{
-					broadcastAll(std::make_shared<ChatPacket>(pd.player->name, ChatPacket::e_ChatPlayerLeftGame));
-				}
-			}
-
-			remove(pd.player);
-		}
-	}
+	drainPendingDisconnects();
 
 	// Drain the close queue: snapshot the deque, then release the CS before
 	// calling disconnect() which may itself try to acquire other locks.

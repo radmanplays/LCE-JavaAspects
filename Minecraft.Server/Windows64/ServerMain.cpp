@@ -784,6 +784,16 @@ int main(int argc, char **argv)
 	MinecraftServer *server = MinecraftServer::getInstance();
 	if (server != NULL)
 	{
+		// A queued autosave action would spawn a bg save that races with the
+		// exit save's Flush() on the singleton CSaveGame::m_pSaveData buffer.
+		if (app.GetXuiServerAction(kServerActionPad) != eXuiServerAction_Idle)
+		{
+			LogWorldIO("Waiting for pending XUI server action before exit save...");
+			if (!WaitForWorldActionIdle(kServerActionPad, 30000, &TickCoreSystems, &HandleXuiActions))
+			{
+				LogWorldIO("XUI server action drain timed out; continuing with exit save");
+			}
+		}
 		// Drain any in-flight autosave before requesting the exit save so the
 		// async autosave can't overwrite the exit save with an older snapshot,
 		// and so m_saveOnExit gets set (prior logic skipped it when a save was
@@ -822,10 +832,30 @@ int main(int argc, char **argv)
 		waitThread.WaitForCompletion(INFINITE);
 	}
 
-	while (ConsoleSaveFileOriginal::hasPendingBackgroundSave())
+	if (ConsoleSaveFileOriginal::hasPendingBackgroundSave())
 	{
-		TickCoreSystems();
-		Sleep(10);
+		LogWorldIO("waiting for exit save to land on disk...");
+		const DWORD kExitDrainTimeoutMs = 60000;
+		const DWORD drainStart = GetTickCount();
+		bool timedOut = false;
+		while (ConsoleSaveFileOriginal::hasPendingBackgroundSave())
+		{
+			if ((LONG)(GetTickCount() - drainStart) > (LONG)kExitDrainTimeoutMs)
+			{
+				timedOut = true;
+				break;
+			}
+			TickCoreSystems();
+			Sleep(10);
+		}
+		if (timedOut)
+		{
+			LogWarn("world-io", "exit save drain TIMED OUT; save may be incomplete");
+		}
+		else
+		{
+			LogWorldIO("exit save drain complete");
+		}
 	}
 
 	LogInfof("shutdown", "Cleaning up and exiting.");

@@ -1544,6 +1544,12 @@ void MinecraftServer::stopServer(bool didInit)
 			}
 		}
 	}
+	// connection->stop() enqueued disconnects; the run loop is gone, so
+	// drain now or DisconnectPacket + sendAndQuit() never fire.
+	if (players != nullptr)
+	{
+		players->drainPendingDisconnects();
+	}
 	// reset the primary player signout flag
 	m_bPrimaryPlayerSignedOut=false;
 	s_bServerHalted = false;

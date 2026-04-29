@@ -98,6 +98,7 @@ public:
     void move(shared_ptr<ServerPlayer> player);
     void remove(shared_ptr<ServerPlayer> player);
 	void queueDisconnect(shared_ptr<ServerPlayer> player, int reason, const wstring& kickMessage, bool wasKicked, bool fourKitHandledQuit);
+	void drainPendingDisconnects();
     shared_ptr<ServerPlayer> getPlayerForLogin(PendingConnection *pendingConnection, const wstring& userName, PlayerUID xuid, PlayerUID OnlineXuid);
     shared_ptr<ServerPlayer> respawn(shared_ptr<ServerPlayer> serverPlayer, int targetDimension, bool keepAllPlayerData);
     void toggleDimension(shared_ptr<ServerPlayer> player, int targetDimension);

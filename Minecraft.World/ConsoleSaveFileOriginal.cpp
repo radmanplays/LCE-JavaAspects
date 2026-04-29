@@ -16,6 +16,7 @@
 #include <thread>
 #include <atomic>
 #include <mutex>
+#include "ServerLogger.h"
 
 static std::atomic<bool> s_bgSaveActive{false};
 static std::mutex s_bgSaveMutex;
@@ -28,8 +29,20 @@ struct BackgroundSaveResult
 	BYTE textMeta[88] = {};
 	int textMetaBytes = 0;
 	bool pending = false;
+	bool isAutosave = false;
+	int64_t startTickMs = 0;
+	unsigned int rawBytes = 0;
+	unsigned int compressedBytes = 0;
 };
 static BackgroundSaveResult s_bgResult;
+
+// Snapshotted under s_bgSaveMutex; SaveSaveDataCallback reads without
+// re-locking (std::mutex is non-recursive, callback fires synchronously
+// inside SaveSaveData while flushPendingBackgroundSave holds the lock).
+static bool s_lastSaveIsAutosave = false;
+static int64_t s_lastSaveStartTickMs = 0;
+static unsigned int s_lastSaveRawBytes = 0;
+static unsigned int s_lastSaveCompressedBytes = 0;
 #endif
 
 
@@ -729,11 +742,18 @@ void ConsoleSaveFileOriginal::Flush(bool autosave, bool updateThumbnail )
 		StorageManager.GetSaveUniqueNumber(&uid);
 		TelemetryManager->RecordLevelSaveOrCheckpoint(ProfileManager.GetPrimaryPad(), uid, fileSize);
 
+		const int64_t startMs = static_cast<int64_t>(GetTickCount());
+		const bool modeAutosave = autosave;
+		ServerRuntime::LogInfof("world-io",
+			"save started: mode=%s raw=%u bytes",
+			modeAutosave ? "autosave" : "exit", fileSize);
+
 		ReleaseSaveAccess();
 		s_bgSaveActive.store(true, std::memory_order_release);
 
-		std::thread([snap, fileSize, thumb, thumbSz, meta, metaLen, this]() {
+		std::thread([snap, fileSize, thumb, thumbSz, meta, metaLen, modeAutosave, startMs, this]() {
 			Compression::UseDefaultThreadStorage();
+			const int64_t compStartMs = static_cast<int64_t>(GetTickCount());
 			unsigned int compLen = fileSize + 8;
 			byte *buf = static_cast<byte *>(StorageManager.AllocateSaveData(compLen));
 			if (!buf)
@@ -751,6 +771,11 @@ void ConsoleSaveFileOriginal::Flush(bool autosave, bool updateThumbnail )
 				ZeroMemory(buf, 8);
 				memcpy(buf + 4, &fileSize, sizeof(fileSize));
 
+				const int64_t compMs = static_cast<int64_t>(GetTickCount()) - compStartMs;
+				ServerRuntime::LogInfof("world-io",
+					"save compressed: %u->%u bytes in %lldms",
+					fileSize, compLen, (long long)compMs);
+
 				// store the result so flushPendingBackgroundSave() can pick it up on the main thread next tick
 				// StorageManager isnt thread safe so we cant call SetSaveImages or SaveSaveData from here. Bwoomp
 				std::lock_guard<std::mutex> lk(s_bgSaveMutex);
@@ -759,11 +784,17 @@ void ConsoleSaveFileOriginal::Flush(bool autosave, bool updateThumbnail )
 				s_bgResult.thumbSize = thumbSz;
 				memcpy(s_bgResult.textMeta, meta, sizeof(meta));
 				s_bgResult.textMetaBytes = metaLen;
+				s_bgResult.isAutosave = modeAutosave;
+				s_bgResult.startTickMs = startMs;
+				s_bgResult.rawBytes = fileSize;
+				s_bgResult.compressedBytes = compLen;
 				s_bgResult.pending = true;
 			}
 			else
 			{
 				app.DebugPrintf("save buf alloc failed\n");
+				ServerRuntime::LogError("world-io",
+					"save compression failed: out of memory; save dropped");
 				s_bgSaveActive.store(false, std::memory_order_release);
 			}
 			delete[] snap;
@@ -771,6 +802,7 @@ void ConsoleSaveFileOriginal::Flush(bool autosave, bool updateThumbnail )
 		return;
 	}
 	app.DebugPrintf("snapshot alloc failed (%u bytes)\n", fileSize);
+	ServerRuntime::LogError("world-io", "save snapshot allocation failed; save dropped");
 #endif
 
 	// Assume that the compression will make it smaller so initially attempt to allocate the current file size
@@ -984,6 +1016,22 @@ int ConsoleSaveFileOriginal::SaveSaveDataCallback(LPVOID lpParam,bool bRes)
 #endif
 
 #ifdef MINECRAFT_SERVER_BUILD
+	{
+		const int64_t totalMs = static_cast<int64_t>(GetTickCount()) - s_lastSaveStartTickMs;
+		const char *mode = s_lastSaveIsAutosave ? "autosave" : "exit";
+		if (bRes)
+		{
+			ServerRuntime::LogInfof("world-io",
+				"save write completed: mode=%s raw=%u compressed=%u total=%lldms",
+				mode, s_lastSaveRawBytes, s_lastSaveCompressedBytes, (long long)totalMs);
+		}
+		else
+		{
+			ServerRuntime::LogErrorf("world-io",
+				"save write FAILED: mode=%s raw=%u compressed=%u total=%lldms",
+				mode, s_lastSaveRawBytes, s_lastSaveCompressedBytes, (long long)totalMs);
+		}
+	}
 	s_bgSaveActive.store(false, std::memory_order_release);
 #endif
 
@@ -1238,17 +1286,32 @@ void *ConsoleSaveFileOriginal::getWritePointer(FileEntry *file)
 #ifdef MINECRAFT_SERVER_BUILD
 void ConsoleSaveFileOriginal::flushPendingBackgroundSave()
 {
-	std::lock_guard<std::mutex> lk(s_bgSaveMutex);
-	if (!s_bgResult.pending)
-		return;
+	PBYTE thumbData = nullptr;
+	DWORD thumbSize = 0;
+	BYTE textMeta[88] = {};
+	int textMetaBytes = 0;
+	void *owner = nullptr;
+	{
+		std::lock_guard<std::mutex> lk(s_bgSaveMutex);
+		if (!s_bgResult.pending)
+			return;
 
-	StorageManager.SetSaveImages(
-		s_bgResult.thumbData, s_bgResult.thumbSize,
-		nullptr, 0, s_bgResult.textMeta, s_bgResult.textMetaBytes);
-	StorageManager.SaveSaveData(&ConsoleSaveFileOriginal::SaveSaveDataCallback, s_bgResult.owner);
+		thumbData = s_bgResult.thumbData;
+		thumbSize = s_bgResult.thumbSize;
+		memcpy(textMeta, s_bgResult.textMeta, sizeof(textMeta));
+		textMetaBytes = s_bgResult.textMetaBytes;
+		owner = s_bgResult.owner;
 
-	s_bgResult.pending = false;
-	// the actual write isnt done until SaveSaveDataCallback fires
+		s_lastSaveIsAutosave = s_bgResult.isAutosave;
+		s_lastSaveStartTickMs = s_bgResult.startTickMs;
+		s_lastSaveRawBytes = s_bgResult.rawBytes;
+		s_lastSaveCompressedBytes = s_bgResult.compressedBytes;
+
+		s_bgResult.pending = false;
+	}
+
+	StorageManager.SetSaveImages(thumbData, thumbSize, nullptr, 0, textMeta, textMetaBytes);
+	StorageManager.SaveSaveData(&ConsoleSaveFileOriginal::SaveSaveDataCallback, owner);
 }
 
 bool ConsoleSaveFileOriginal::hasPendingBackgroundSave()
