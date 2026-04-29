@@ -913,7 +913,7 @@ shared_ptr<ServerPlayer> PlayerList::respawn(shared_ptr<ServerPlayer> serverPlay
 	// necessary)
 	updatePlayerGameMode(player, serverPlayer, level);
 
-	// 4J Added: Hardcore mode — force Adventure mode on respawn
+	// 4J Added: Hardcore mode forces Adventure mode on respawn
 	if (server->getLevel(0)->getLevelData()->isHardcore())
 	{
 		player->gameMode->setGameModeForPlayer(GameType::ADVENTURE);
@@ -1375,7 +1375,7 @@ void PlayerList::tick()
 
 #ifdef _WINDOWS64
 		// The old Connection's read/write threads are now dead (disconnect waits
-		// for them). Safe to recycle the smallId — no stale write thread can
+		// for them). Safe to recycle the smallId: no stale write thread can
 		// resolve getPlayer() to a new connection that reuses this slot.
 		WinsockNetLayer::PushFreeSmallId(smallId);
 		WinsockNetLayer::ClearSocketForSmallId(smallId);
