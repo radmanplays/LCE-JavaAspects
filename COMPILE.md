@@ -15,7 +15,8 @@
 VS 2022 has built-in CMake support, so there is no need to generate a `.sln` file by hand.
 
 1. Install the prerequisites above.
-2. Clone the repo.
+2. Clone the repo with submodules. If you don't, you will get a build error!
+    - `git clone --recurse-submodules https://github.com/itsRevela/LCE-Revelations.git`
 3. In Visual Studio: `File > Open > Folder...` and select the **repo root** (the folder that contains `CMakeLists.txt`).
 4. Wait for CMake to configure (~5 seconds on a warm cache, a few minutes on the first run while assets copy).
 5. Pick a build configuration in the dropdown, for example `windows64-release`.
