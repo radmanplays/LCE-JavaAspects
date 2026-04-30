@@ -2335,10 +2335,9 @@ void MinecraftServer::tick()
 			int64_t st2 = System::currentTimeMillis();
 			PIXEndNamedEvent();
 			PIXBeginNamedEvent(0,"Entity tick %d",i);
-			// 4J added: do not tick entities in empty dimensions.
+#ifdef __PSVITA__
 			if ((players->getPlayerCount(level) > 0) || level->hasEntitiesToRemove())
 			{
-#ifdef __PSVITA__
 				// AP - the PlayerList->viewDistance initially starts out at 3 to make starting a level speedy
 				// the problem with this is that spawned monsters are always generated on the edge of the known map
 				// which means they wont process (unless they are surrounded by 2 visible chunks). This means
@@ -2348,9 +2347,9 @@ void MinecraftServer::tick()
 				level->getServer()->getPlayers()->setViewDistance(newViewDistance);
 				level->getTracker()->updateMaxRange();
 				level->getChunkMap()->setRadius(level->getServer()->getPlayers()->getViewDistance());
-#endif
-				level->tickEntities();
 			}
+#endif
+			level->tickEntities();
 			PIXEndNamedEvent();
 
 			int64_t stEntDone = System::currentTimeMillis();
