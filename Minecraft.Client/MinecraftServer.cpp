@@ -1839,7 +1839,7 @@ void MinecraftServer::run(int64_t seed, void *lpParameter)
                         int64_t iter_t3 = System::currentTimeMillis();
                         int64_t iter_total = iter_t3 - iter_t0;
                         outerIterTickWork += iter_total;
-                        if (iter_total > 60)
+                        if (iter_total > 200)
                         {
                             ServerRuntime::LogInfof("perf",
                                 "iter total=%lldms pre=%lld tick=%lld post=%lld",
@@ -2198,7 +2198,7 @@ void MinecraftServer::run(int64_t seed, void *lpParameter)
                 }
             }
 
-            if (outerIterTotal > 60)
+            if (outerIterTotal > 200)
             {
                 ServerRuntime::LogInfof("perf",
                     "outerIter total=%lldms tickWork=%lld postTickOverhead=%lld",
@@ -2263,7 +2263,7 @@ void MinecraftServer::tick()
 {
 	// Per-substep wall-clock timing. Logs one summary line when total tick
 	// exceeds TICK_SLOW_THRESHOLD_MS.
-	const int64_t TICK_SLOW_THRESHOLD_MS = 60;
+	const int64_t TICK_SLOW_THRESHOLD_MS = 200;
 	const int kMaxLevelsRecorded = 8;
 	int64_t tickStart = System::currentTimeMillis();
 	int64_t lvlTickMs[kMaxLevelsRecorded] = {0};

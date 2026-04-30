@@ -189,7 +189,7 @@ void ServerConnection::tick()
 
 #if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
 		int64_t sc_loopTotal = System::currentTimeMillis() - sc_loopT0;
-		if (sc_loopTotal > 50)
+		if (sc_loopTotal > 150)
 		{
 			ServerRuntime::LogInfof("perf",
 				"conn playerLoop total=%lldms players=%d chunkUs=%lld tickUs=%lld flushUs=%lld | avg chunk=%lld tick=%lld flush=%lld",

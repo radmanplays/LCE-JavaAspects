@@ -379,7 +379,7 @@ void PlayerChunkMap::tick()
 {
 #if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
 	// Substep timing for slow chunkMap diagnostics.
-	const int64_t CHUNKMAP_SLOW_THRESHOLD_MS = 50;
+	const int64_t CHUNKMAP_SLOW_THRESHOLD_MS = 150;
 	int64_t cm_t0 = System::currentTimeMillis();
 	int    cm_addReqStart = (int)addRequests.size();
 	g_findUsAccum = 0;

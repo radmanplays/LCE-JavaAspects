@@ -201,7 +201,7 @@ void ServerLevel::tick()
 #if defined(_WINDOWS64) && defined(MINECRAFT_SERVER_BUILD)
 	// ts[N] = wall-clock at substep N. Logged when level total exceeds
 	// LEVEL_SLOW_THRESHOLD_MS to pinpoint the dominant substep.
-	const int64_t LEVEL_SLOW_THRESHOLD_MS = 50;
+	const int64_t LEVEL_SLOW_THRESHOLD_MS = 150;
 	int64_t ts[13];
 	ts[0] = System::currentTimeMillis();
 #endif
